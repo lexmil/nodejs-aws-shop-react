@@ -19,14 +19,20 @@ export class FrontendStack extends cdk.Stack {
     // Create a CloudFront distribution
     const distribution = new cloudfront.Distribution(this, 'alexm-distribution-id', {
       defaultBehavior: {
-        origin: new origins.S3Origin(websiteBucket),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(websiteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        compress: true,
       },
       defaultRootObject: 'index.html',
       errorResponses: [
         {
           httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+        },
+        {
+          httpStatus: 403,
           responseHttpStatus: 200,
           responsePagePath: '/index.html',
         }
@@ -38,7 +44,8 @@ export class FrontendStack extends cdk.Stack {
       sources: [s3deploy.Source.asset('./dist')],
       destinationBucket: websiteBucket,
       distribution,
-      distributionPaths: ['/*']
+      distributionPaths: ['/*'],
+      prune: true
     });
 
     // Output the CloudFront URL

@@ -33,7 +33,7 @@ export default function Header() {
             underline="none"
             to="/"
           >
-            AWS Shop
+            AWS 4 Shop
           </Link>
         </Typography>
 
