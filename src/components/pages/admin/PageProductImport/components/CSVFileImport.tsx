@@ -1,14 +1,63 @@
 import React from "react";
+import axios, { AxiosError } from "axios";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
+import { useMutation } from "react-query";
 
 type CSVFileImportProps = {
   url: string;
   title: string;
 };
 
+interface Headers {
+  Authorization: string;
+}
+
 export default function CSVFileImport({ url, title }: CSVFileImportProps) {
-  const [file, setFile] = React.useState<File>();
+  const [file, setFile] = React.useState<File | undefined>();
+
+  const TOKEN = localStorage.getItem("authorization_token");
+
+  const headers: Partial<Headers> = {};
+
+  if (TOKEN) headers.Authorization = `Basic ${TOKEN}`;
+
+  const { mutateAsync } = useMutation<
+    string,
+    AxiosError,
+    { url: string; fileName: string }
+  >(async ({ url, fileName }: { url: string; fileName: string }) => {
+    return axios
+      .get(url, {
+        params: { name: fileName },
+        headers,
+      })
+      .then(({ data }) => {
+        console.log("Authorization: OK");
+
+        return data;
+      })
+      .catch(({ response }) => {
+        let message = "";
+
+        switch (response?.status) {
+          case 401:
+            message = "401 Unauthorized";
+            break;
+          case 403:
+            message = "403 Forbidden";
+            break;
+          default:
+            message = "Unknown error";
+        }
+
+        window.dispatchEvent(
+          new CustomEvent("show-alert", {
+            detail: { message, severity: "error" },
+          })
+        );
+      });
+  });
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -25,22 +74,31 @@ export default function CSVFileImport({ url, title }: CSVFileImportProps) {
   const uploadFile = async () => {
     console.log("uploadFile to", url);
 
-    // Get the presigned URL
-    // const response = await axios({
-    //   method: "GET",
-    //   url,
-    //   params: {
-    //     name: encodeURIComponent(file.name),
-    //   },
-    // });
-    // console.log("File to upload: ", file.name);
-    // console.log("Uploading to: ", response.data);
-    // const result = await fetch(response.data, {
-    //   method: "PUT",
-    //   body: file,
-    // });
-    // console.log("Result: ", result);
-    // setFile("");
+    if (!file) {
+      console.error("uploaded file is absent");
+      return;
+    }
+
+    try {
+      const mutateAsyncUrl = await mutateAsync({
+        url,
+        fileName: encodeURIComponent(file?.name || ""),
+      });
+
+      console.log("File to upload: ", file?.name);
+      console.log("Uploading to: ", mutateAsyncUrl);
+
+      const result = await fetch(mutateAsyncUrl, {
+        method: "PUT",
+        body: file,
+      });
+
+      console.log("Uploading complete: ", result);
+
+      setFile(undefined);
+    } catch (error) {
+      console.error("Uploading error: ", error);
+    }
   };
   return (
     <Box>
