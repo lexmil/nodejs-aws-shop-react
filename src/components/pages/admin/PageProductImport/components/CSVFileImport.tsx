@@ -83,6 +83,12 @@ export default function CSVFileImport({ url, title }: CSVFileImportProps) {
       });
 
       console.log("File to upload: ", file?.name);
+
+      if (!mutateAsyncUrl) {
+        console.error("Uploading error: no URL");
+        return;
+      }
+
       console.log("Uploading to: ", mutateAsyncUrl);
 
       const result = await fetch(mutateAsyncUrl, {
