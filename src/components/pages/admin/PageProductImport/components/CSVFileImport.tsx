@@ -4,60 +4,57 @@ import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import { useMutation } from "react-query";
 
-type CSVFileImportProps = {
+interface CSVFileImportProps {
   url: string;
   title: string;
-};
+}
 
-interface Headers {
-  Authorization: string;
+interface MutationProps {
+  url: string;
+  name: string;
 }
 
 export default function CSVFileImport({ url, title }: CSVFileImportProps) {
   const [file, setFile] = React.useState<File | undefined>();
 
-  const TOKEN = localStorage.getItem("authorization_token");
+  const { mutateAsync } = useMutation<string, AxiosError, MutationProps>(
+    async ({ url, name }: MutationProps) => {
+      return axios
+        .get(url, {
+          params: { name },
+          headers: {
+            // You have to store localStorage key authorization_token that equals YWRtaW46YWRtaW4=
+            Authorization: `Basic ${localStorage.getItem(
+              "authorization_token"
+            )}`,
+          },
+        })
+        .then(({ data }) => data)
+        .catch(({ response }) => {
+          let message = "";
 
-  const headers: Partial<Headers> = {};
+          switch (response?.status) {
+            case 401:
+              message = "401 Unauthorized - Invalid credentials";
+              break;
+            case 403:
+              message = "403 Forbidden - Insufficient permissions";
+              break;
+            case 400:
+              message = "400 Bad Request - Invalid request parameters";
+              break;
+            default:
+              message = "Unknown error occurred";
+          }
 
-  if (TOKEN) headers.Authorization = `Basic ${TOKEN}`;
-
-  const { mutateAsync } = useMutation<
-    string,
-    AxiosError,
-    { url: string; fileName: string }
-  >(async ({ url, fileName }: { url: string; fileName: string }) => {
-    return axios
-      .get(url, {
-        params: { name: fileName },
-        headers,
-      })
-      .then(({ data }) => {
-        console.log("Authorization: OK");
-
-        return data;
-      })
-      .catch(({ response }) => {
-        let message = "";
-
-        switch (response?.status) {
-          case 401:
-            message = "401 Unauthorized";
-            break;
-          case 403:
-            message = "403 Forbidden";
-            break;
-          default:
-            message = "Unknown error";
-        }
-
-        window.dispatchEvent(
-          new CustomEvent("show-alert", {
-            detail: { message, severity: "error" },
-          })
-        );
-      });
-  });
+          window.dispatchEvent(
+            new CustomEvent("show-alert", {
+              detail: { message, severity: "error" },
+            })
+          );
+        });
+    }
+  );
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -82,7 +79,7 @@ export default function CSVFileImport({ url, title }: CSVFileImportProps) {
     try {
       const mutateAsyncUrl = await mutateAsync({
         url,
-        fileName: encodeURIComponent(file?.name || ""),
+        name: encodeURIComponent(file?.name || ""),
       });
 
       console.log("File to upload: ", file?.name);
